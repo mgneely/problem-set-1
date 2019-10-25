@@ -1,0 +1,196 @@
+---
+title: "Pset 1"
+author: "Maria Neely"
+date: "10/24/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(skimr)
+library(dendextend)
+library(clValid)
+library(ggplot2)
+load("/Users/owner/Desktop/macs-405/problem-set-1/State Leg Prof Data & Codebook/legprof-components.v1.0.RData")
+```
+
+
+```{r problem 2}
+#2b. only include years 2009 and 2010
+clean_dset <- x %>% filter(year == 2009 | year == 2010)
+
+#2a. select relevant variables 
+
+clean_dset <- clean_dset %>% 
+  select(t_slength, slength, salary_real, expend, fips)
+
+#2c omit all missing values
+clean_dset <- na.omit(clean_dset)
+
+#2d standardize input features using function scale()
+clean_dset[c(1:4)] <- scale(clean_dset[c(1:4)])
+
+#2e get data into workable form
+state_ids <- x %>% select(fips, stateabv) %>% distinct()
+dset_with_state <- merge(clean_dset, state_ids, by = "fips")
+dset_with_state <- dset_with_state[-c(1)]
+
+clean_dset<- clean_dset[,1:4]
+
+```
+
+
+```{r problem 3, echo=FALSE}
+#VAT
+library("seriation")
+clean_dset_dist <- dist(clean_dset)
+VAT(clean_dset_dist, colorkey = TRUE, main = "VAT")
+
+```
+After assessing the Visual Assessment of Tendency (VAT), there is no apparent natural pattern in our data between salary, expenditure, total length of sessions (special and regular) and length of regular sessions. This does not mean that there are no clusters within the data, rather it shows on precursory analysis, these variables are dissimilar. 
+
+```{r problem 4}
+rownames(dset_with_state) <- dset_with_state[,5]
+dset_with_state <- dset_with_state[-5]
+y <- dist(dset_with_state)
+hc_complete <- hclust(y, method="complete"); plot(hc_complete, hang=-1)
+rect.hclust(hc_complete, k =3)
+
+#cut the trees
+cuts <- cutree(hc_complete, 
+               k = c(3,4))
+
+
+### Compare tables to see where the clusters lie
+table(#`2 Clusters` = cuts[,1], 
+      `3 Clusters` = cuts[,1],
+      `4 Clusters` = cuts[,2])
+
+```
+
+```{r problem 5}
+#fit kmeans algorithm 
+library(clValid)
+set.seed(4545)
+
+
+kmeans <- kmeans(y, 
+                 centers = 3,
+                 nstart = 15)
+kmeans
+
+kmeans$cluster
+kmeans$centers
+kmeans$size
+
+SHOW SCATTERPLOT ACROSS TWO FEATURES, CONDITION COLOR OF THE POINT OF CLUSTER ASSIGNMENTS
+
+#t <- as.table(kmeans$cluster)
+#(t <- data.frame(t))
+#rownames(t) <- dset_with_state$stateabv
+#colnames(t) <- dset_with_state$cluster
+
+
+```
+
+```{r problem 6}
+# Load a few extra libraries
+library(mixtools)
+library(plotGMM)
+
+#GMMs
+set.seed(7355) 
+gmm_expend <- normalmixEM(clean_dset$expend, 
+                    k = 2) 
+
+gmm_salary <- normalmixEM(clean_dset$salary_real, 
+                    k = 2) 
+
+gmm_tlength <- normalmixEM(clean_dset$t_slength, 
+                    k = 2) 
+
+gmm_slength <- normalmixEM(clean_dset$slength, 
+                    k = 2) 
+#plot each GMM
+DO SCATTER PLOTS TO GET SENSE OF REAL DISTRIBUTION LOOKS LIKE BASED ON ASSIGNMENTS
+
+#expenditure
+ggplot(data.frame(x = gmm_expend$x)) +
+  geom_histogram(aes(x, ..density..), fill = "darkgray") +
+  stat_function(geom = "line", fun = plot_mix_comps,
+                args = list(gmm_expend$mu[1], gmm_expend$sigma[1], lam = gmm_expend$lambda[1]),
+                colour = "darkred") +
+  stat_function(geom = "line", fun = plot_mix_comps,
+                args = list(gmm_expend$mu[2], gmm_expend$sigma[2], lam = gmm_expend$lambda[2]),
+                colour = "darkblue") +
+  xlab("Expenditure") +
+  ylab("Density") + 
+  theme_bw()
+
+#salary
+ggplot(data.frame(x = gmm_salary$x)) +
+  geom_histogram(aes(x, ..density..), fill = "darkgray") +
+  stat_function(geom = "line", fun = plot_mix_comps,
+                args = list(gmm_salary$mu[1], gmm_salary$sigma[1], lam = gmm_salary$lambda[1]),
+                colour = "darkred") +
+  stat_function(geom = "line", fun = plot_mix_comps,
+                args = list(gmm_salary$mu[2], gmm_salary$sigma[2], lam = gmm_salary$lambda[2]),
+                colour = "darkblue") +
+  xlab("Salary") +
+  ylab("Density") + 
+  theme_bw()
+
+#total length
+ggplot(data.frame(x = gmm_tlength$x)) +
+  geom_histogram(aes(x, ..density..), fill = "darkgray") +
+  stat_function(geom = "line", fun = plot_mix_comps,
+                args = list(gmm_tlength$mu[1], gmm_tlength$sigma[1], lam = gmm_tlength$lambda[1]),
+                colour = "darkred") +
+  stat_function(geom = "line", fun = plot_mix_comps,
+                args = list(gmm_tlength$mu[2], gmm_tlength$sigma[2], lam = gmm_tlength$lambda[2]),
+                colour = "darkblue") +
+  xlab("Total Length of Session") +
+  ylab("Density") + 
+  theme_bw()
+
+#slength
+ggplot(data.frame(x = gmm_slength$x)) +
+  geom_histogram(aes(x, ..density..), fill = "darkgray") +
+  stat_function(geom = "line", fun = plot_mix_comps,
+                args = list(gmm_slength$mu[1], gmm_slength$sigma[1], lam = gmm_slength$lambda[1]),
+                colour = "darkred") +
+  stat_function(geom = "line", fun = plot_mix_comps,
+                args = list(gmm_slength$mu[2], gmm_slength$sigma[2], lam = gmm_slength$lambda[2]),
+                colour = "darkblue") +
+  xlab("Length of Regular Session") +
+  ylab("Density") + 
+  theme_bw()
+
+```
+```{r problem 7}
+
+```
+
+```{r problem 8}
+# check internal validation
+#total session length
+library(mclust)
+int_tslength <- as.matrix(clean_dset)
+
+internal_tslength <- clValid(int_tslength, 2:10, 
+                    clMethods = c("kmeans", "hierarchical","model"), 
+                    validation = "internal"); summary(internal)
+
+#FOR CONNECTIVITY WANT SMALL VALUES
+par(mfrow = c(2, 2))
+
+plot(internal_tslength, legend = FALSE,
+     type = "l",
+     main = " ")
+
+
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
