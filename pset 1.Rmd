@@ -12,7 +12,7 @@ library(skimr)
 library(dendextend)
 library(clValid)
 library(ggplot2)
-load("/Users/owner/Desktop/macs-405/problem-set-1/State Leg Prof Data & Codebook/legprof-components.v1.0.RData")
+x<- get(load("/Users/owner/Desktop/macs-405/problem-set-1/State Leg Prof Data & Codebook/legprof-components.v1.0.RData"))
 ```
 
 
@@ -48,7 +48,8 @@ clean_dset_dist <- dist(clean_dset)
 VAT(clean_dset_dist, colorkey = TRUE, main = "VAT")
 
 ```
-After assessing the Visual Assessment of Tendency (VAT), there is no apparent natural pattern in our data between salary, expenditure, total length of sessions (special and regular) and length of regular sessions. This does not mean that there are no clusters within the data, rather it shows on precursory analysis, these variables are dissimilar. 
+
+3. After assessing the Visual Assessment of Tendency (VAT), it is all one muddled color, suggesting there is no apparent natural pattern in our data between salary, expenditure, total length of sessions (special and regular) and length of regular sessions. This does not mean that there are no clusters within the data. Rather, it shows on precursory analysis that these variables are dissimilar. Further analysis is needed to see if there are in fact clusters in our data. 
 
 ```{r problem 4}
 rownames(dset_with_state) <- dset_with_state[,5]
@@ -59,15 +60,25 @@ rect.hclust(hc_complete, k =3)
 
 #cut the trees
 cuts <- cutree(hc_complete, 
-               k = c(3,4))
+               k = c(2,3,4))
 
 
 ### Compare tables to see where the clusters lie
-table(#`2 Clusters` = cuts[,1], 
-      `3 Clusters` = cuts[,1],
-      `4 Clusters` = cuts[,2])
+table_2_v_3 <- table('2 Clusters' = cuts[,1],
+                     '3 Clusters' = cuts[,2])
+
+table3_v_4 <- table('3 Clusters' = cuts[,2], 
+                    '4 Clusters' = cuts[,3])
+
+table_2_v_3
+
+table3_v_4
+
 
 ```
+
+4. After looking at our dendrogram (and graphing the clusters), we see that California lies alone in a cluster, and most other states are clustered together. There is another cluster including Massachusetts, New York, Pennsylvania, Ohio, Illinois and Michigan, which makes logical sense because these states' legislatures have special characteristics, such as term limits, which according to Squire (2007) increases professionalism (New York, Michigan and Ohio), and extremely high salaries (Pennsylvania, Illinois, Michigan and Ohio). Given the continuous variables we worked with, we can say there is a range of legislative professionalism throughout states, rather than legislative professionalism being a binary of either professional or not professional. We see similar results after examining tables comparing having 2 or 3 clusters, or having 3 or 4 clusters. When comparing having 2 clusters or 3 clusters, we see that there is the largest cluster is cluster 1, and the second largest cluster is cluster 3, indicating 3 clusters is more appropriate than 2 clusters. Furthermore, when comparing having 3 clusters or 4 clusters, we once again see here is the largest cluster is cluster 1, and the second largest cluster is cluster 3, indicating once again 3 clusters may be most appropriate.
+ 
 
 ```{r problem 5}
 #fit kmeans algorithm 
@@ -76,7 +87,7 @@ set.seed(4545)
 
 
 kmeans <- kmeans(y, 
-                 centers = 3,
+                 centers = 2,
                  nstart = 15)
 kmeans
 
@@ -84,15 +95,32 @@ kmeans$cluster
 kmeans$centers
 kmeans$size
 
-SHOW SCATTERPLOT ACROSS TWO FEATURES, CONDITION COLOR OF THE POINT OF CLUSTER ASSIGNMENTS
+#Scatterplots to better see what is going on visually
 
-#t <- as.table(kmeans$cluster)
-#(t <- data.frame(t))
-#rownames(t) <- dset_with_state$stateabv
-#colnames(t) <- dset_with_state$cluster
+ggplot(clean_dset, 
+       aes(x=salary_real, y=expend)) + 
+  geom_point(aes(color = kmeans$cluster)) + 
+  xlab("Salary") +
+  ylab("Expenditures") + 
+  theme_bw()
+  
+ggplot(clean_dset, 
+       aes(x=salary_real, y=t_slength)) + 
+  geom_point(aes(color = kmeans$cluster)) + 
+  xlab("Salary") +
+  ylab("Total Session Length (regular and special)") + 
+  theme_bw()
 
+ggplot(clean_dset, 
+       aes(x=slength, y=t_slength)) + 
+  geom_point(aes(color = kmeans$cluster)) + 
+  xlab("Regular Session Length") +
+  ylab("Total Session Length (regular and special)") + 
+  theme_bw()
 
 ```
+
+5. Given our kmeans output, we have two clusters of 4 and 44 states. However, the sum of squares by cluster is only 66%, indicating that only 66% of the data is well grouped. When looking at the kmeans method visually, we see some distinction between clusters 1 and 2 when comparing salary vs. total session lengths (cluster 1 being in the upper right section of the graph, cluster 2 being in the lower left section of the graph). When comparing Salary vs. Expenditures and regular session length vs. total session length, there is less distinction between the two clusters. Thus, our graphs may substantiate that while there are two clusters, they may not necessarily by well grouped.  
 
 ```{r problem 6}
 # Load a few extra libraries
@@ -112,8 +140,66 @@ gmm_tlength <- normalmixEM(clean_dset$t_slength,
 
 gmm_slength <- normalmixEM(clean_dset$slength, 
                     k = 2) 
-#plot each GMM
-DO SCATTER PLOTS TO GET SENSE OF REAL DISTRIBUTION LOOKS LIKE BASED ON ASSIGNMENTS
+
+gmm_expend$loglik
+gmm_salary$loglik
+gmm_tlength$loglik
+gmm_slength$loglik
+
+gmm_expend$sigma
+gmm_salary$sigma
+gmm_tlength$sigma
+gmm_slength$sigma
+
+gmm_expend$mu
+gmm_salary$mu
+gmm_tlength$mu
+gmm_slength$mu
+
+
+```
+
+6. Given the output for our GMMs for each variable, we see that the expenditure GMM has the highest log likelihood statistic (-35.89) out of the 4 GMMs, leading us to believe this model best captures the clusters. Additionally, for the expenditure GMM, the cluster 1 sigma statistic is the smallest amongst our 4 GMMs, indicating the smallest variation between distances within cluster 1, further substantiating the model's accuracy.
+
+```{r problem 7, echo = FALSE}
+#dendrogram
+plot(hc_complete, hang=-1)
+rect.hclust(hc_complete, k =3)
+
+#kmeans scatterplots
+ggplot(clean_dset, 
+       aes(x=salary_real, y=expend)) + 
+  geom_point(aes(color = kmeans$cluster)) + 
+  xlab("Salary") +
+  ylab("Expenditures") + 
+  theme_bw()
+  
+ggplot(clean_dset, 
+       aes(x=salary_real, y=t_slength)) + 
+  geom_point(aes(color = kmeans$cluster)) + 
+  xlab("Salary") +
+  ylab("Total Session Length (regular and special)") + 
+  theme_bw()
+
+ggplot(clean_dset, 
+       aes(x=slength, y=t_slength)) + 
+  geom_point(aes(color = kmeans$cluster)) + 
+  xlab("Regular Session Length") +
+  ylab("Total Session Length (regular and special)") + 
+  theme_bw()
+
+#gmms
+gmm_expend <- normalmixEM(clean_dset$expend, 
+                    k = 3) 
+
+gmm_salary <- normalmixEM(clean_dset$salary_real, 
+                    k = 3) 
+
+gmm_tlength <- normalmixEM(clean_dset$t_slength, 
+                    k = 3) 
+
+gmm_slength <- normalmixEM(clean_dset$slength, 
+                    k = 3) 
 
 #expenditure
 ggplot(data.frame(x = gmm_expend$x)) +
@@ -167,30 +253,47 @@ ggplot(data.frame(x = gmm_slength$x)) +
   ylab("Density") + 
   theme_bw()
 
-```
-```{r problem 7}
+
 
 ```
+
+7. One high-level takeaway from these visualizations is that cluster one is much denser than cluster 2. In the dendrogram, we see many more states branching off of the first leg of the tree than the second, indicating a higher density. Similarly, in the GMM histograms, there is a higher density of observations in towards lower x values and in the kmeans scatterplots, there is a high density of points in the lower left corner of the graphs compared to the upper corner of the graph.
+
+We can also make determinations on the number of clusters based on these visualizations. As stated above, we see for all three methods that cluster 1 has less intra-cluster variation than cluster 2. Some of this large intra-cluster variation in cluster 2 may be due to an outlier. When we graph the dendrogram with 3 clusters, California stands alone, which makes sense because its state government is extremely unique. Furthermore, we can see California standing alone in the histograms graphed for our four Gaussian Mixture models. Because California is an outlier, we see the second cluster (the blue line) is misfit, and has extreme variance in order to fit the outlier. Similarly, when comparing the scatterplots for the kmeans method, we see an outlier in the top right corner of graphs comparing regular session length vs total session length and salary vs expenditure, perhaps once again indicating California is an outlier. Thus, with California being an extreme outlier, two clusters may not be sufficient to capture the groupings of the data. Perhaps, we should cluster the data by k = 3. This is supported by the fact that the three clusters seen in our dendrogram make sense logically, given the special components in state legislatures of the smaller clusters.
 
 ```{r problem 8}
 # check internal validation
 #total session length
 library(mclust)
-int_tslength <- as.matrix(clean_dset)
+int <- as.matrix(clean_dset)
 
-internal_tslength <- clValid(int_tslength, 2:10, 
+internal <- clValid(int, 2:10, 
                     clMethods = c("kmeans", "hierarchical","model"), 
                     validation = "internal"); summary(internal)
 
 #FOR CONNECTIVITY WANT SMALL VALUES
 par(mfrow = c(2, 2))
 
-plot(internal_tslength, legend = FALSE,
+plot(internal, legend = TRUE,
      type = "l",
      main = " ")
 
+#test k=3
+kmeans <- kmeans(y, 
+                 centers = 3,
+                 nstart = 15)
+kmeans
 
+kmeans$cluster
+kmeans$centers
+kmeans$size
 
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+9a. Given the fit on our internal validation graphs, we see that the Gaussian Mixture Model has the worst fit across connectivity, silhouette and dunn validation methods. The kmeans and hierarchical models have a similar fit visually, indicating they are more internally valid methods. 
+
+9b. Given this internal validation, the hierarchical approach is optimal, due to its optimal internal validation scores. The hierarchical approach had the lowest connectivity index, the highest silhouette index and the highest dunn index. Furthermore, the optimal value for k is 2, given that for both the silhouette and connectivity indices are optimal at k=2. Interestingly, the dunn index is optimal at k=3, indicating there may be a possibility that k=3 clustering may be a possibility.
+
+9c. Perhaps, because of the discrepancy of optimal number of clusters between the dunn index versus the silhouette and connectivity indices, it may make sense to select a technically "sub-optimal" partitioning method. This is because each model has underlying assumptions that may not fit our data set. For example, the GMM assumes cluster shapes can be arbitrarily drawn, indicating it is used best when observations may be far apart in Euclidean space, but close probabilistically. The kmeans method, on the other hand, assumes circular clusters, and that each observation belongs to one cluster and one cluster only. The hierarchical structure assumes that there are underlying natural groupings in the data. In the case of our data, the hierarchical structure assumption may be too strong given that our initial ODI showed no natural patterns, thus indicating our data is dissimilar. Thus, perhaps kmeans, although technically "sub-optimal", may be the best for our data. There is further proof for this when re-running the kmeans method with 3 clusters (or k=3). Now, 80.3% of our data is well grouped (vs 66% for k=2), indicating 3 clusters under the kmeans method is a more accurate.
+
